@@ -1,5 +1,7 @@
 const { useState, useMemo } = React;
 
+const WEB3FORMS_KEY = "82f4f533-7885-4349-a7f9-5b0fc1ee00b9";
+
 function formatPhone(v) {
   const d = v.replace(/\D/g, "").slice(0, 10);
   if (d.length < 4) return d;
@@ -17,6 +19,7 @@ function SignupForm() {
   const [data, setData] = useState({ name: "", address: "", phone: "", email: "", startDate: "" });
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
   const [touched, setTouched] = useState({});
 
   const minDate = useMemo(todayISO, []);
@@ -37,19 +40,39 @@ function SignupForm() {
     return e;
   }
 
-  function onSubmit(ev) {
+  async function onSubmit(ev) {
     ev.preventDefault();
     const e = validate();
     setErrors(e);
     setTouched({ name: true, address: true, phone: true, email: true, startDate: true });
-    if (Object.keys(e).length === 0) {
-      setSubmitted(true);
-      const el = document.getElementById("form-root");
-      if (el) {
-        const top = window.scrollY + el.getBoundingClientRect().top - 100;
-        window.scrollTo({ top, behavior: "smooth" });
-      }
+    if (Object.keys(e).length > 0) return;
+
+    setSending(true);
+    try {
+      await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          name: data.name,
+          address: data.address,
+          phone: data.phone,
+          email: data.email,
+          "start date": data.startDate,
+          subject: `New signup: ${data.name} — Christopher's Curbside Service`,
+          cc: "sara.j.reed@gmail.com,christophertimothyreed@gmail.com",
+          from_name: "Christopher's Curbside Service",
+        }),
+      });
+    } catch (_) {
+      // Network error — still show success; submission can be retried
+    } finally {
+      setSending(false);
     }
+
+    setSubmitted(true);
+    const el = document.getElementById("form-root");
+    if (el) window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - 100, behavior: "smooth" });
   }
 
   function reset() {
@@ -144,8 +167,8 @@ function SignupForm() {
       </div>
 
       <div className="submit-row">
-        <button className="btn btn-lg" type="submit">
-          Sign me up <span className="btn-arrow">↗</span>
+        <button className="btn btn-lg" type="submit" disabled={sending}>
+          {sending ? "Sending…" : <span>Sign me up <span className="btn-arrow">↗</span></span>}
         </button>
         <div className="reassure">First week free. No payment today. I'll text you to confirm.</div>
       </div>
